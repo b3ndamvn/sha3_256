@@ -16,7 +16,6 @@ class Sponge:
             for x in range(5):
                 for z in range(64):
                     a[x][y][z] = s[64 * (5 * y + x) + z]
-        print(f'determine_a result is {a}')
         return a
 
     def determine_s(self, a) -> str:
@@ -25,7 +24,6 @@ class Sponge:
             for x in range(5):
                 for z in range(64):
                     s += str(a[x][y][z])
-        print(f'determine_s result is {s}')
         return s
 
     def start_absorb(self):
@@ -34,17 +32,24 @@ class Sponge:
             a = self.determine_a(result)
             rnd_result = self.rnd(a, i)
             self.s = self.determine_s(rnd_result)
-        print(f'start_absorb result is {self.s}')
         return self.s
 
     def rnd(self, a, i):
+        '''
+        Учитывая массив состояний A и индекс раунда ir , функция раунда Rnd - это преобразование, которое получается в
+        результате применения пошаговых отображений θ, ρ, π, χ и ι в таком порядке
+        '''
         new_a = a.copy()
         for _ in range(24):
             new_a = self.iota_function(self.xi_function(self.pi_function(self.theta_function(new_a))), i)
-        print(f'rnd result is {new_a}')
         return new_a
 
     def theta_function(self, a: list) -> list:
+        '''
+        Эффект θ заключается в XOR каждого бита в состоянии с четностью двух столбцов в массиве. В частности, для бита
+        A[x0 , y0 , z0 ] координата x одного из столбцов равна (x0 - 1) mod 5, с той же координатой z, z0 ,
+        а координата x другого столбца равна (x0 + 1) mod 5, с координатой z (z0 - 1) mod w.
+        '''
         c = [[[] for _ in range(64)] for _ in range(5)]
         for x in range(5):
             for z in range(64):
@@ -58,10 +63,14 @@ class Sponge:
             for y in range(5):
                 for z in range(64):
                     new_a[x][y][z] = int(a[x][y][z]) ^ d[x][z]
-        print(f'theta-function result is {new_a}')
         return new_a
 
     def ro_function(self, a: list) -> list:
+        '''
+        Эффект ρ заключается в повороте битов каждой дорожки на длину, называемую смещением, которая зависит от
+        фиксированных координат x и y дорожки. Эквивалентно, для каждого бита в полосе координата z изменяется путем
+        добавления смещения, по модулю размера полосы.
+        '''
         new_a = [[[[] for _ in range(64)] for _ in range(5)] for _ in range(5)]
         for z in range(64):
             new_a[0][0][z] = a[0][0][z]
@@ -70,25 +79,28 @@ class Sponge:
             for z in range(64):
                 new_a[x][y][z] = a[x][y][(z - (t + 1) * (t + 2) / 2) % 64]
                 x, y = y, (2 * x + 3 * y) % 5
-        print(f'ro_function result is {new_a}')
         return new_a
 
     def pi_function(self, a: list) -> list:
+        '''
+        Эффект π заключается в изменении положения дорожек
+        '''
         new_a = [[[[] for _ in range(64)] for _ in range(5)] for _ in range(5)]
         for x in range(5):
             for y in range(5):
                 for z in range(64):
                     new_a[x][y][z] = a[(x + 3 * y) % 5][x][z]
-        print(f'pi_function result is {new_a}')
         return new_a
 
     def xi_function(self, a: list) -> list:
+        '''
+        Эффект χ заключается в XOR каждого бита с нелинейной функцией двух других битов в его ряду
+        '''
         new_a = [[[[] for _ in range(64)] for _ in range(5)] for _ in range(5)]
         for x in range(5):
             for y in range(5):
                 for z in range(64):
                     new_a[x][y][z] = int(a[x][y][z]) ^ ((int(a[(x + 1) % 5][y][z]) ^ 1) * int(a[(x + 2) % 5][y][z]))
-        print(f'xi_function result is {new_a}')
         return new_a
 
     def rc_algorithm(self, t: int) -> int:
@@ -102,22 +114,24 @@ class Sponge:
             r[-6] = int(r[-6]) ^ int(r[0])
             r[-7] = int(r[-7]) ^ int(r[0])
             r = r[:8]
-        print(f'rc_algorithm result is {int(r[-1])}')
         return int(r[-1])
 
     def iota_function(self, a: list, i: int) -> list:
+        '''
+        Эффект ι заключается в изменении некоторых битов дорожки (0, 0) способом, который зависит от индекса раунда ir.
+        Остальные 24 дорожки не подвержены влиянию ι.
+        '''
         new_a = a.copy()
         rc = list('0' * 64)
         for j in range(6):
             rc[2 ** j - 1] = self.rc_algorithm(j + 7 * i)
         for z in range(64):
             new_a[0][0][z] = int(new_a[0][0][z]) ^ int(rc[z])
-        print(f'iota_function result is {new_a}')
         return new_a
 
     def start_squeezing(self):
         self.test = self.s
-        z = self.test
+        z = self.test[:1088]
         i = 0
         while len(z) < 256:
             a = self.determine_a(self.test)
@@ -125,7 +139,6 @@ class Sponge:
             self.test = self.determine_s(rnd_result)
             z += self.test
             i += 1
-        print(f'start_squeezing result is {z[-256:]}')
         return z[-256:]
 
 
@@ -144,7 +157,6 @@ class SHA3:
         for byte in byte_message:
             binary = format(byte, 'b')
             result.append(binary)
-        print(f'convert_to_binary result is {"".join(result)}')
         return ''.join(result)
 
     def pad_message(self):
@@ -153,12 +165,9 @@ class SHA3:
             padded_message = self.binary_message + '1'
             padded_message = padded_message.ljust(self.RATE-1, '0') + '1'
             return padded_message
-        print(f'pad_message result is {self.binary_message}')
         return self.binary_message
 
     def divide_into_blocks(self):
-        test = re.findall('\d' * self.RATE, self.padded_message)
-        print(f'divide_into_blocks result is {test}')
         return re.findall('\d' * self.RATE, self.padded_message)
 
     def encrypt_message(self):
